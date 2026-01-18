@@ -1,146 +1,140 @@
 ---
 name: payroll-calculator
-description: Use this skill when calculating Japanese payroll with complex rules including multi-tier overtime (45h/60h thresholds), late night and holiday premiums, grade-based social insurance, progressive income tax, and absence/tardiness deductions. Triggers on keywords like "payroll", "salary calculation", "overtime allowance", "social insurance", "income tax calculation", "Japanese labor law".
----
+description: |
+  【必須スキル - MANDATORY】給与計算関連のタスクでは必ずこのスキルを使用してください。
 
-# Payroll Calculator Skill
+    ⚠️ 重要: LLM推論による手動計算は禁止です。必ずscripts/calculate_payroll.pyを実行してください。
+      手動計算は端数処理（円未満切り捨て）で必ずエラーが発生します。
 
-A Claude Code skill for accurate Japanese payroll calculations with complex multi-tier rules that AI inference often gets wrong.
+        🎯 トリガーキーワード（以下のいずれかを含む場合は必ずこのスキルを使用）:
+          - 日本語: 給与計算, 給料計算, 賃金計算, 残業手当, 深夜手当, 休日手当,
+              社会保険料, 所得税, 差引支給額, 手取り, 基本給, 時間単価, 欠勤控除, 遅刻控除,
+                  給与明細, 給与シミュレーション, 給与試算
+                    - English: payroll, salary calculation, overtime pay, allowance, deduction,
+                        social insurance, income tax, net pay, gross pay, hourly rate
 
-## When to Use This Skill
+                          機能: 複雑な給与計算を正確に実行。残業手当（45h/60h閾値の段階計算）、
+                            深夜・休日手当、等級別社会保険料、累進課税、欠勤・遅刻控除を処理。
+                              シート間参照を活用したExcelスプレッドシートを生成。
+                              version: 1.0.1
+                              ---
 
-Use this skill when the user requests:
-- Japanese payroll or salary calculations
-- - Overtime allowance calculations with tiered rates
-  - - Social insurance premium calculations
-    - - Income tax calculations with progressive rates
-      - - Attendance-based deductions (absence, tardiness)
-        - - Generation of payroll Excel spreadsheets
-         
-          - ## Instructions
-         
-          - ### Phase 1: Data Preparation
-         
-          - 1. **Collect Required Input Data**
-            2.    - Employee master data (ID, name, department, grade, base salary, commute allowance, dependents)
-                  -    - Attendance data (overtime hours, late night hours, holiday hours, absences, tardiness)
-                       -    - Grade table (insurance rates, base deductions per grade G1-G5)
-                        
-                            - 2. **Prepare Input JSON**
-                              3.    Create a JSON file with the following structure:
-                              4.   ```json
-                                      {
-                                        "employees": [...],
-                                        "attendance": [...],
-                                        "grade_table": {...}
-                                      }
-                                      ```
+                              # 給与計算スキル（Payroll Calculator）
 
-                                   ### Phase 2: Execute Calculation
+                              ## ⚠️ 最重要注意事項
 
-                                   Run the payroll calculation script:
-                                   ```bash
-                                   python scripts/calculate_payroll.py input.json output.json
-                                   ```
+                              **このスキルは必ずPythonスクリプトを実行して計算してください。**
 
-                                   ### Phase 3: Generate Excel Output
+                              ❌ やってはいけないこと:
+                              - LLMの推論で給与計算をする
+                              - 頭の中で計算する
+                              - 計算式を書いて手動で答えを出す
 
-                                   Generate the Excel spreadsheet with 6 sheets:
-                                   ```bash
-                                   python scripts/generate_excel.py output.json payroll.xlsx
-                                   ```
+                              ✅ 必ずやること:
+                              - `scripts/calculate_payroll.py` を実行する
+                              - 出力されたJSONの値をそのまま使用する
 
-                                   ### Phase 4: Verify Results (Optional)
+                              **理由**: LLMは端数処理（円未満切り捨て）を正確に適用できません。
+                              例: 350,000÷160 = 2,187.5 → 正解は2,187（切り捨て）
+                              LLMは2,187.5のまま次の計算に進み、誤差が累積します。
 
-                                   Compare against expected values:
-                                   ```bash
-                                   python scripts/verify_results.py output.json expected.json
-                                   ```
+                              ## Overview
 
-                                   ## Calculation Rules Summary
+                              このスキルは、日本の企業で発生する複雑な給与計算を**正確に**実行します。
+                              AIが計算を間違えやすい複雑な条件分岐を、Pythonスクリプトで確実に処理します。
 
-                                   ### Overtime Allowances (Critical - Tiered Calculation)
+                              ## 重要な原則
 
-                                   | Hours | Rate | Formula |
-                                   |-------|------|---------|
-                                   | 0-45h | 1.25x | hourly_rate * 1.25 * hours |
-                                   | 45-60h | 1.35x | (45h @ 1.25x) + (excess @ 1.35x) |
-                                   | 60h+ | 1.50x | (45h @ 1.25x) + (15h @ 1.35x) + (excess @ 1.50x) |
+                              1. **計算は必ずPythonスクリプトで実行** - AIの推論による計算ミスを防止（必須）
+                              2. **段階的な検証** - 各ステップで計算結果を検証
+                              3. **シート間参照を活用** - Excel数式でトレーサビリティを確保
 
-                                   ### Other Premiums
-                                   - **Late Night**: +0.25x (22:00-05:00)
-                                   - - **Holiday Work**: 1.35x
-                                     - - **Holiday Late Night**: 1.60x (1.35 + 0.25)
-                                      
-                                       - ### Deductions
-                                       - - **Absence**: 3 days or less: daily_rate * days / 4+ days: daily_rate * days * 0.8
-                                         - - **Tardiness**: Less than 4: (hourly/2) * count / 4+: (hourly/2) * count * 1.5
-                                          
-                                           - ### Social Insurance (Grade-based)
-                                           - - G1, G2: 14.5%
-                                             - - G3, G4: 15.0%
-                                               - - G5: 15.5%
-                                                
-                                                 - ### Income Tax (Progressive)
-                                                 - - 0-162,500: 5%
-                                                   - - 162,501-275,000: 10% - 8,125
-                                                     - - 275,001+: 20% - 35,625
-                                                      
-                                                       - ## Examples
-                                                      
-                                                       - ### Example 1: Basic Payroll Calculation
-                                                      
-                                                       - **User Request**: "Calculate payroll for employee Tanaka with base salary 300,000, 50 hours overtime"
-                                                      
-                                                       - **Execution**:
-                                                       - ```bash
-                                                         # Prepare input.json with employee data
-                                                         python scripts/calculate_payroll.py input.json output.json
-                                                         ```
+                              ## 使用場面（トリガー条件）
 
-                                                         **Expected Output**:
-                                                         - Hourly rate: 300,000 / 160 = 1,875
-                                                         - - Overtime: (45h * 1,875 * 1.25) + (5h * 1,875 * 1.35) = 118,406
-                                                          
-                                                           - ### Example 2: Full Payroll with Excel
-                                                          
-                                                           - **User Request**: "Generate monthly payroll spreadsheet for 3 employees"
-                                                          
-                                                           - **Execution**:
-                                                           - ```bash
-                                                             python scripts/calculate_payroll.py employees.json results.json
-                                                             python scripts/generate_excel.py results.json payroll_2025_01.xlsx
-                                                             ```
+                              以下のキーワードがユーザーのリクエストに含まれる場合、**必ず**このスキルを使用:
 
-                                                             **Output**: Excel file with 6 sheets (Master, Attendance, Allowances, Deductions, Payslip, Verification)
+                              - 「給与計算」「給料計算」「賃金計算」
+                              - 「残業手当」「深夜手当」「休日手当」
+                              - 「社会保険料」「所得税」「住民税」
+                              - 「差引支給額」「手取り」「控除」
+                              - 「基本給」「時間単価」
+                              - 「欠勤」「遅刻」「早退」
+                              - "payroll", "salary", "overtime", "allowance", "deduction"
+                              - 複数の残業区分（45h以下、45-60h、60h超）がある給与計算
+                              - 等級別の社会保険料率が異なる場合
+                              - 累進課税の計算が必要な場合
+                              - 欠勤・遅刻による控除がある場合
+                              - シート間連携が必要なExcelファイルを生成する場合
 
-                                                             ## What This Skill Cannot Do
+                              ## 実行手順
 
-                                                             - Tax filing or year-end adjustments
-                                                             - - Bonus calculations
-                                                               - - Retirement benefit calculations
-                                                                 - - Social insurance grade determination (requires separate lookup)
-                                                                   - - Currency conversions (JPY only)
-                                                                    
-                                                                     - ## File Structure
-                                                                    
-                                                                     - ```
-                                                                       scripts/
-                                                                         calculate_payroll.py  # Core calculation engine
-                                                                         generate_excel.py     # Excel output generator
-                                                                         verify_results.py     # Result verification
+                              ### Step 1: 入力データの準備
 
-                                                                       references/
-                                                                         calculation-rules.md  # Detailed calculation formulas
-                                                                         troubleshooting.md    # Common issues and solutions
-                                                                       ```
+                              以下のJSON形式で従業員データを準備します：
 
-                                                                       ## Dependencies
-
-                                                                       - Python 3.8+
-                                                                       - - openpyxl (for Excel generation): `pip install openpyxl`
-                                                                        
-                                                                         - ## Related Documentation
-                                                                        
-                                                                         - For detailed calculation rules, see [references/calculation-rules.md](references/calculation-rules.md)
-                                                                         - For troubleshooting, see [references/troubleshooting.md](references/troubleshooting.md)
+                              ```json
+                              {
+                                "employees": [
+                                    {
+                                          "id": "E001",
+                                                "name": "田中一郎",
+                                                      "department": "営業部",
+                                                            "grade": "G3",
+                                                                  "base_salary": 350000,
+                                                                        "dependents": 2,
+                                                                              "commute_allowance": 15000
+                                                                                  }
+                                                                                    ],
+                                                                                      "attendance": [
+                                                                                          {
+                                                                                                "employee_id": "E001",
+                                                                                                      "regular_overtime_hours": 25,
+                                                                                                            "late_night_overtime_hours": 8,
+                                                                                                                  "holiday_work_hours": 12,
+                                                                                                                        "holiday_late_night_hours": 4,
+                                                                                                                              "absence_days": 2,
+                                                                                                                                    "tardiness_count": 3
+                                                                                                                                        }
+                                                                                                                                          ],
+                                                                                                                                            "grade_table": {
+                                                                                                                                                "G1": {"insurance_rate": 0.145, "base_deduction": 5000},
+                                                                                                                                                    "G2": {"insurance_rate": 0.145, "base_deduction": 5000},
+                                                                                                                                                        "G3": {"insurance_rate": 0.150, "base_deduction": 8000},
+                                                                                                                                                            "G4": {"insurance_rate": 0.150, "base_deduction": 8000},
+                                                                                                                                                                "G5": {"insurance_rate": 0.155, "base_deduction": 10000}
+                                                                                                                                                                  }
+                                                                                                                                                                  }
+                                                                                                                                                                  ```
+                                                                                                                                                                  
+                                                                                                                                                                  ### Step 2: 計算の実行
+                                                                                                                                                                  
+                                                                                                                                                                  Pythonスクリプトを使用して計算を実行します：
+                                                                                                                                                                  
+                                                                                                                                                                  ```bash
+                                                                                                                                                                  python scripts/calculate_payroll.py input.json output.json
+                                                                                                                                                                  ```
+                                                                                                                                                                  
+                                                                                                                                                                  ### Step 3: Excelファイルの生成
+                                                                                                                                                                  
+                                                                                                                                                                  計算結果からExcelファイルを生成します：
+                                                                                                                                                                  
+                                                                                                                                                                  ```bash
+                                                                                                                                                                  python scripts/generate_excel.py output.json payroll.xlsx
+                                                                                                                                                                  ```
+                                                                                                                                                                  
+                                                                                                                                                                  ## 計算ルール詳細
+                                                                                                                                                                  
+                                                                                                                                                                  詳細な計算ルールは [references/calculation-rules.md](references/calculation-rules.md) を参照してください。
+                                                                                                                                                                  
+                                                                                                                                                                  ## 検証方法
+                                                                                                                                                                  
+                                                                                                                                                                  計算結果を検証するには：
+                                                                                                                                                                  
+                                                                                                                                                                  ```bash
+                                                                                                                                                                  python scripts/verify_results.py output.json expected.json
+                                                                                                                                                                  ```
+                                                                                                                                                                  
+                                                                                                                                                                  ## トラブルシューティング
+                                                                                                                                                                  
+                                                                                                                                                                  問題が発生した場合は [references/troubleshooting.md](references/troubleshooting.md) を参照してください。
+                                                                                                                                                                  
